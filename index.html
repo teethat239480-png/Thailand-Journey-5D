@@ -1,0 +1,1261 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Thailand Journey 3D — เที่ยวไทยตอบให้ถูก</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts: Prompt & Kanit -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;600;700;800&family=Sarabun:wght@400;600;700&display=swap">
+
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Prompt', sans-serif;
+            background-color: #0d1b2a;
+            color: #ffffff;
+        }
+
+        #canvas-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        /* Glassmorphism UI Style */
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 2px solid rgba(255, 215, 0, 0.4);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
+        .gold-border {
+            border: 3px solid #f39c12;
+            box-shadow: 0 0 15px rgba(243, 156, 18, 0.5);
+        }
+
+        .blue-gradient-text {
+            background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .gold-gradient-text {
+            background: linear-gradient(135deg, #FFE000 0%, #799F0C 100%);
+            background: linear-gradient(to right, #f80, #ff0);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* Custom Buttons */
+        .btn-thai {
+            background: linear-gradient(180deg, #ff9f43 0%, #ee5253 100%);
+            border: 2px solid #ffeaa7;
+            box-shadow: 0 6px 0 #b33939, 0 10px 20px rgba(0,0,0,0.4);
+            transition: all 0.1s ease;
+        }
+
+        .btn-thai:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 #b33939, 0 4px 10px rgba(0,0,0,0.4);
+        }
+
+        .btn-blue {
+            background: linear-gradient(180deg, #54a0ff 0%, #2e86de 100%);
+            border: 2px solid #c8d6e5;
+            box-shadow: 0 6px 0 #222f3e, 0 10px 20px rgba(0,0,0,0.4);
+        }
+
+        .btn-blue:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 #222f3e, 0 4px 10px rgba(0,0,0,0.4);
+        }
+
+        /* Question Banner Responsive Text */
+        .question-text {
+            font-size: clamp(16px, 2.5vw, 26px);
+            line-height: 1.25;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+        }
+
+        /* Pulsing Glow Animation */
+        @keyframes pulseGlow {
+            0% { box-shadow: 0 0 10px rgba(255, 215, 0, 0.4); }
+            50% { box-shadow: 0 0 25px rgba(255, 215, 0, 0.9); }
+            100% { box-shadow: 0 0 10px rgba(255, 215, 0, 0.4); }
+        }
+
+        .pulse-gold {
+            animation: pulseGlow 2s infinite;
+        }
+
+        /* Hide Scrollbars */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* Feedback Toast Overlay */
+        #feedback-toast {
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body class="relative w-full h-full overflow-hidden select-none">
+
+    <div id="canvas-container"></div>
+
+    <div id="ui-layer" class="relative z-10 w-full h-full flex flex-col justify-between pointer-events-none p-2 sm:p-4">
+
+        <!-- HEADER / TOP HUD (Active in Game) -->
+        <div id="game-hud" class="w-full flex flex-col items-center gap-1.5 hidden">
+            <div class="w-full flex justify-between items-center max-w-5xl mx-auto px-1">
+                <!-- Left Info: Player & Score -->
+                <div class="glass-panel rounded-xl px-3 py-1.5 flex items-center gap-2 border-amber-400/50 pointer-events-auto">
+                    <div class="w-8 h-8 rounded-full bg-amber-500/30 flex items-center justify-center border border-amber-300">
+                        <i class="fa-solid fa-user-ninja text-amber-300 text-sm"></i>
+                    </div>
+                    <div>
+                        <div id="hud-player-name" class="text-[10px] sm:text-xs text-amber-200/80 font-medium">นักเดินทาง</div>
+                        <div class="text-sm sm:text-base font-bold text-white flex items-center gap-1">
+                            <span>คะแนน:</span>
+                            <span id="hud-score" class="text-yellow-300">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Info: Question Counter & Sound Toggle -->
+                <div class="flex items-center gap-2 pointer-events-auto">
+                    <div class="glass-panel rounded-xl px-3 py-1.5 border-amber-400/50 text-center">
+                        <div class="text-[10px] sm:text-xs text-amber-200/80 font-medium">ข้อที่</div>
+                        <div class="text-sm sm:text-base font-bold text-cyan-300">
+                            <span id="hud-current-q">1</span>/<span id="hud-total-q">20</span>
+                        </div>
+                    </div>
+                    <button id="btn-sound-toggle" class="glass-panel w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-amber-300 hover:bg-amber-500/20 active:scale-95 transition">
+                        <i id="sound-icon" class="fa-solid fa-volume-high text-base"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- QUESTION BANNER (Compact & Lifted Up) -->
+            <div class="w-full max-w-3xl mx-auto pointer-events-auto">
+                <div class="glass-panel gold-border rounded-xl px-3 py-2 sm:px-5 sm:py-3 text-center pulse-gold relative overflow-hidden bg-slate-950/90">
+                    <div class="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-amber-400 mb-0.5 flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-compass"></i>
+                        <span id="hud-theme-title">ภูมิภาคและจังหวัดของประเทศไทย</span>
+                    </div>
+                    <div id="question-box" class="question-text font-bold text-white drop-shadow-md min-h-[2.2rem] flex items-center justify-center">
+                        กำลังโหลดคำถาม...
+                    </div>
+                </div>
+
+                <!-- Progress Bar -->
+                <div class="w-full bg-slate-800/80 h-2 rounded-full mt-1 border border-slate-600/50 overflow-hidden p-0.5">
+                    <div id="progress-bar-fill" class="h-full bg-gradient-to-r from-yellow-400 via-amber-500 to-emerald-400 rounded-full transition-all duration-500 w-0"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TOUCH CONTROL BUTTONS FOR MOBILE -->
+        <div id="touch-controls" class="w-full max-w-lg mx-auto flex justify-between items-center px-4 pb-4 pointer-events-auto hidden sm:hidden">
+            <button id="btn-touch-left" class="w-20 h-20 rounded-full bg-amber-500/80 active:bg-amber-600 text-white text-3xl flex items-center justify-center border-4 border-white/50 shadow-2xl active:scale-90 transition">
+                <i class="fa-solid fa-arrow-left"></i>
+            </button>
+            <div class="text-xs text-white/70 bg-black/40 px-3 py-1 rounded-full backdrop-blur">
+                เลื่อนเลน
+            </div>
+            <button id="btn-touch-right" class="w-20 h-20 rounded-full bg-amber-500/80 active:bg-amber-600 text-white text-3xl flex items-center justify-center border-4 border-white/50 shadow-2xl active:scale-90 transition">
+                <i class="fa-solid fa-arrow-right"></i>
+            </button>
+        </div>
+    </div>
+
+    <div id="feedback-toast" class="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 opacity-0 pointer-events-none scale-90 transition-all duration-300">
+        <div id="feedback-card" class="px-8 py-5 rounded-3xl text-center shadow-2xl border-4 text-white font-extrabold text-2xl sm:text-3xl flex items-center gap-4 min-w-[280px] justify-center">
+            <i id="feedback-icon" class="fa-solid fa-circle-check text-4xl"></i>
+            <span id="feedback-msg">ถูกต้อง!</span>
+        </div>
+    </div>
+
+    <div id="start-screen" class="fixed inset-0 z-40 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+        <div class="glass-panel gold-border rounded-3xl max-w-2xl w-full p-6 sm:p-8 text-center flex flex-col items-center gap-5 max-h-[95vh] overflow-y-auto no-scrollbar pointer-events-auto">
+            
+            <div class="space-y-1">
+                <div class="inline-block px-4 py-1 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 text-xs sm:text-sm font-semibold tracking-wide">
+                    🇹🇭 สังคมศึกษา ป.4 🇹🇭
+                </div>
+                <h1 class="text-3xl sm:text-5xl font-extrabold gold-gradient-text tracking-tight">
+                    Thailand Journey 3D
+                </h1>
+                <p class="text-lg sm:text-xl font-medium text-cyan-200">
+                    เที่ยวไทยตอบให้ถูก
+                </p>
+            </div>
+
+            <p class="text-sm sm:text-base text-slate-300 max-w-md">
+                ขับรถตุ๊กตุ๊กตะลุย 6 ภูมิภาคทั่วไทย เลือกขับชนป้ายคำตอบที่ถูกต้องเพื่อสะสมคะแนน!
+            </p>
+
+            <!-- Player Input Form -->
+            <div class="w-full max-w-md space-y-3">
+                <div class="text-left text-xs text-amber-300 font-semibold pl-1">
+                    <i class="fa-solid fa-id-card"></i> กรอกชื่อนักเดินทางของคุณ:
+                </div>
+                <input type="text" id="input-player-name" maxlength="15" placeholder="พิมพ์ชื่อตรงนี้ (เช่น น้องเจมส์)" 
+                       class="w-full px-5 py-3 rounded-2xl bg-slate-900/90 border-2 border-amber-400/60 text-white placeholder-slate-500 focus:outline-none focus:border-amber-300 text-center text-lg font-bold">
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="w-full max-w-md flex flex-col sm:flex-row gap-3 mt-2">
+                <button id="btn-start-game" class="btn-thai flex-1 py-3.5 px-6 rounded-2xl font-bold text-xl text-white tracking-wide hover:brightness-110 active:scale-95 transition">
+                    <i class="fa-solid fa-play mr-2"></i> เริ่มเดินทาง
+                </button>
+            </div>
+
+            <!-- Controls & Info Accordion -->
+            <div class="w-full max-w-md grid grid-cols-2 gap-3 text-xs text-slate-300 pt-2 border-t border-slate-700/60">
+                <div class="bg-slate-900/60 p-3 rounded-xl border border-slate-700 text-left">
+                    <div class="font-bold text-amber-400 mb-1 flex items-center gap-1">
+                        <i class="fa-solid fa-keyboard"></i> การควบคุม:
+                    </div>
+                    <ul class="space-y-0.5">
+                        <li>• ปุ่มลูกศร ซ้าย / ขวา</li>
+                        <li>• ปุ่ม A / D</li>
+                        <li>• ปัดหน้าจอ Swipe / Touch</li>
+                    </ul>
+                </div>
+                <div class="bg-slate-900/60 p-3 rounded-xl border border-slate-700 text-left">
+                    <div class="font-bold text-cyan-400 mb-1 flex items-center gap-1">
+                        <i class="fa-solid fa-map-location-dot"></i> สถานที่ในเกม:
+                    </div>
+                    <p class="text-[11px] leading-relaxed">
+                        เมือง • ภูเขา • ทุ่งนา • ทะเล • วัด • ตลาดน้ำ
+                    </p>
+                </div>
+            </div>
+
+            <!-- Leaderboard Preview -->
+            <div class="w-full max-w-md text-left">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-xs font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
+                        <i class="fa-solid fa-trophy text-amber-400"></i> Top 10 นักเดินทางสุดยอด
+                    </span>
+                </div>
+                <div id="start-leaderboard-list" class="bg-slate-950/70 border border-slate-800 rounded-xl p-2 max-h-36 overflow-y-auto no-scrollbar space-y-1.5 text-xs">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <div id="gameover-screen" class="fixed inset-0 z-40 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-lg hidden">
+        <div class="glass-panel gold-border rounded-3xl max-w-lg w-full p-6 sm:p-8 text-center flex flex-col items-center gap-5 pointer-events-auto">
+            
+            <div class="w-20 h-20 rounded-full bg-gradient-to-tr from-amber-500 to-yellow-300 p-1 shadow-xl flex items-center justify-center">
+                <div class="w-full h-full rounded-full bg-slate-950 flex items-center justify-center text-amber-400 text-4xl">
+                    <i class="fa-solid fa-award"></i>
+                </div>
+            </div>
+
+            <div>
+                <h2 class="text-3xl font-extrabold text-white">สิ้นสุดการเดินทาง!</h2>
+                <p class="text-slate-300 text-sm mt-1">สรุปผลการท่องเที่ยวประเทศไทย</p>
+            </div>
+
+            <!-- Rank Badge -->
+            <div class="w-full bg-amber-500/10 border border-amber-400/40 rounded-2xl p-4">
+                <div id="go-rank-title" class="text-xl sm:text-2xl font-bold text-amber-300">
+                    นักเที่ยวไทยตัวจริง
+                </div>
+                <div id="go-player-name" class="text-xs text-slate-300 mt-0.5">
+                    ผู้เล่น: -
+                </div>
+            </div>
+
+            <!-- Stats Grid -->
+            <div class="grid grid-cols-3 gap-3 w-full">
+                <div class="bg-slate-900/80 p-3 rounded-2xl border border-slate-700">
+                    <div class="text-xs text-slate-400 font-medium">คะแนนรวม</div>
+                    <div id="go-score" class="text-2xl font-black text-yellow-400 mt-1">0</div>
+                </div>
+                <div class="bg-slate-900/80 p-3 rounded-2xl border border-emerald-500/30">
+                    <div class="text-xs text-emerald-400 font-medium">ตอบถูก</div>
+                    <div id="go-correct" class="text-2xl font-black text-emerald-400 mt-1">0</div>
+                </div>
+                <div class="bg-slate-900/80 p-3 rounded-2xl border border-rose-500/30">
+                    <div class="text-xs text-rose-400 font-medium">ตอบผิด</div>
+                    <div id="go-wrong" class="text-2xl font-black text-rose-400 mt-1">0</div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex flex-col sm:flex-row gap-3 w-full mt-2">
+                <button id="btn-restart" class="btn-thai flex-1 py-3 px-4 rounded-xl font-bold text-white hover:brightness-110 active:scale-95 transition">
+                    <i class="fa-solid fa-rotate-right mr-1"></i> เล่นอีกครั้ง
+                </button>
+                <button id="btn-home" class="btn-blue flex-1 py-3 px-4 rounded-xl font-bold text-white hover:brightness-110 active:scale-95 transition">
+                    <i class="fa-solid fa-house mr-1"></i> หน้าแรก
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        const QUESTION_BANK = [
+            {
+                q: "1. จังหวัดอุดรธานีอยู่ในภาคใด?",
+                options: ["ภาคเหนือ", "ภาคตะวันออกเฉียงเหนือ", "ภาคใต้"],
+                answer: 1,
+                theme: "อีสาน / ทุ่งนา"
+            },
+            {
+                q: "2. จังหวัดใดอยู่ในภาคใต้?",
+                options: ["ภูเก็ต", "เชียงใหม่", "ขอนแก่น"],
+                answer: 0,
+                theme: "ทะเลภาคใต้"
+            },
+            {
+                q: "3. ภูมิภาคใดมีพื้นที่ติดทะเลอันดามัน?",
+                options: ["ภาคใต้", "ภาคเหนือ", "ภาคตะวันออกเฉียงเหนือ"],
+                answer: 0,
+                theme: "ทะเลภาคใต้"
+            },
+            {
+                q: "4. ดอยอินทนนท์ ยอดเขาที่สูงที่สุดอยู่ในจังหวัดใด?",
+                options: ["เชียงใหม่", "ชลบุรี", "สุราษฎร์ธานี"],
+                answer: 0,
+                theme: "ภูเขาภาคเหนือ"
+            },
+            {
+                q: "5. ทะเลบัวแดง เป็นสถานที่สำคัญของจังหวัดใด?",
+                options: ["อุดรธานี", "นครปฐม", "ระยอง"],
+                answer: 0,
+                theme: "อีสาน / ทุ่งนา"
+            },
+            {
+                q: "6. ภาคเหนือของไทยมีลักษณะภูมิประเทศส่วนใหญ่เป็นแบบใด?",
+                options: ["ทิวเขาสลับซับซ้อน", "ที่ราบลุ่มแม่น้ำกว้างใหญ่", "เกาะและชายหาด"],
+                answer: 0,
+                theme: "ภูเขาภาคเหนือ"
+            },
+            {
+                q: "7. จังหวัดเชียงรายและลำปาง ตั้งอยู่ในภาคใด?",
+                options: ["ภาคเหนือ", "ภาคกลาง", "ภาคตะวันออก"],
+                answer: 0,
+                theme: "ภูเขาภาคเหนือ"
+            },
+            {
+                q: "8. ภูมิภาคใดของไทยที่มีพื้นที่กว้างใหญ่ที่สุด?",
+                options: ["ภาคตะวันออกเฉียงเหนือ", "ภาคตะวันตก", "ภาคใต้"],
+                answer: 0,
+                theme: "อีสาน / ทุ่งนา"
+            },
+            {
+                q: "9. อุทยานแห่งชาติเขาใหญ่ ครอบคลุมพื้นที่ภาคใดเป็นหลัก?",
+                options: ["ภาคตะวันออกเฉียงเหนือ", "ภาคใต้", "ภาคเหนือ"],
+                answer: 0,
+                theme: "ภูเขาภาคเหนือ"
+            },
+            {
+                q: "10. จังหวัดชลบุรี และ ระยอง ตั้งอยู่ในภาคใด?",
+                options: ["ภาคตะวันออก", "ภาคเหนือ", "ภาคใต้"],
+                answer: 0,
+                theme: "ทะเลภาคใต้"
+            },
+            {
+                q: "11. แม่น้ำสายสำคัญที่ไหลผ่านภาคกลางคือแม่น้ำใด?",
+                options: ["แม่น้ำเจ้าพระยา", "แม่น้ำโขง", "แม่น้ำตาปี"],
+                answer: 0,
+                theme: "เมืองใหญ่"
+            },
+            {
+                q: "12. ประเพณีบุญบั้งไฟ เป็นเอกลักษณ์ของภาคใด?",
+                options: ["ภาคตะวันออกเฉียงเหนือ", "ภาคใต้", "ภาคเหนือ"],
+                answer: 0,
+                theme: "อีสาน / ทุ่งนา"
+            },
+            {
+                q: "13. จังหวัดสุราษฎร์ธานี และ เกาะสมุย อยู่ในภาคใด?",
+                options: ["ภาคใต้", "ภาคกลาง", "ภาคเหนือ"],
+                answer: 0,
+                theme: "ทะเลภาคใต้"
+            },
+            {
+                q: "14. น้ำตกเอราวัณ และ สะพานข้ามแม่น้ำแคว อยู่ในจังหวัดใด?",
+                options: ["กาญจนบุรี", "ตราด", "ภูเก็ต"],
+                answer: 0,
+                theme: "ภูเขาภาคเหนือ"
+            },
+            {
+                q: "15. กรุงเทพมหานคร เป็นเมืองหลวงตั้งอยู่ในภาคใด?",
+                options: ["ภาคกลาง", "ภาคเหนือ", "ภาคใต้"],
+                answer: 0,
+                theme: "เมืองใหญ่"
+            },
+            {
+                q: "16. ตลาดน้ำอัมพวา ตั้งอยู่ในจังหวัดใด?",
+                options: ["สมุทรสงคราม", "เชียงใหม่", "สงขลา"],
+                answer: 0,
+                theme: "ตลาดน้ำ"
+            },
+            {
+                q: "17. ประเพณียี่เป็ง (ลอยกระทงสาย/โคมลอย) เป็นเอกลักษณ์ของภาคใด?",
+                options: ["ภาคเหนือ", "ภาคตะวันออก", "ภาคใต้"],
+                answer: 0,
+                theme: "วัดและวัฒนธรรม"
+            },
+            {
+                q: "18. จังหวัดขอนแก่น และ นครราชสีมา ตั้งอยู่ในภาคใด?",
+                options: ["ภาคตะวันออกเฉียงเหนือ", "ภาคใต้", "ภาคกลาง"],
+                answer: 0,
+                theme: "อีสาน / ทุ่งนา"
+            },
+            {
+                q: "19. เกาะช้าง เป็นเกาะขนาดใหญ่ตั้งอยู่ในจังหวัดใด?",
+                options: ["ตราด", "ยะลา", "พะเยา"],
+                answer: 0,
+                theme: "ทะเลภาคใต้"
+            },
+            {
+                q: "20. วัดพระแก้ว และ พระบรมมหาราชวัง อยู่ในจังหวัดใด?",
+                options: ["กรุงเทพมหานคร", "เชียงราย", "นครศรีธรรมราช"],
+                answer: 0,
+                theme: "วัดและวัฒนธรรม"
+            }
+        ];
+
+        class SoundEngine {
+            constructor() {
+                this.ctx = null;
+                this.muted = false;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioContext();
+                }
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+
+            playCorrect() {
+                if (this.muted || !this.ctx) return;
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(523.25, now); // C5
+                osc.frequency.exponentialRampToValueAtTime(659.25, now + 0.1); // E5
+                osc.frequency.exponentialRampToValueAtTime(783.99, now + 0.2); // G5
+                osc.frequency.exponentialRampToValueAtTime(1046.50, now + 0.35); // C6
+
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start(now);
+                osc.stop(now + 0.5);
+            }
+
+            playWrong() {
+                if (this.muted || !this.ctx) return;
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(220, now); // A3
+                osc.frequency.linearRampToValueAtTime(110, now + 0.3); // A2
+
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start(now);
+                osc.stop(now + 0.35);
+            }
+
+            playMove() {
+                if (this.muted || !this.ctx) return;
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(300, now);
+                osc.frequency.exponentialRampToValueAtTime(600, now + 0.08);
+
+                gain.gain.setValueAtTime(0.15, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start(now);
+                osc.stop(now + 0.1);
+            }
+        }
+
+        const audio = new SoundEngine();
+
+        const LEADERBOARD_KEY = "thailandJourneyLeaderboard";
+        const LANE_X = [-3.2, 0, 3.2]; // 3 Lanes
+        
+        let gameState = {
+            status: "START", // START, PLAYING, GAMEOVER
+            playerName: "นักเดินทาง",
+            score: 0,
+            correctCount: 0,
+            wrongCount: 0,
+            currentQIndex: 0,
+            questions: [],
+            currentLane: 1, // 0: Left, 1: Center, 2: Right
+            targetX: 0,
+            signSpeed: 0.28,
+            canCollision: true,
+            signsInScene: [],
+            currentShuffledOptions: [],
+            currentCorrectIndex: -1
+        };
+
+        let scene, camera, renderer;
+        let tuktukGroup, roadGroup, sceneryGroup, signGroup;
+        let roadPlanes = [];
+        let sceneryObjects = [];
+
+        function initThree() {
+            const container = document.getElementById('canvas-container');
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x87ceeb); // Sky blue
+            scene.fog = new THREE.FogExp2(0x87ceeb, 0.015);
+
+            camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 200);
+            camera.position.set(0, 5.0, 9.5);
+            camera.lookAt(0, 0.8, -12);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xfffaed, 0.9);
+            dirLight.position.set(20, 40, 20);
+            dirLight.castShadow = true;
+            dirLight.shadow.mapSize.width = 1024;
+            dirLight.shadow.mapSize.height = 1024;
+            dirLight.shadow.camera.near = 0.5;
+            dirLight.shadow.camera.far = 150;
+            const d = 25;
+            dirLight.shadow.camera.left = -d;
+            dirLight.shadow.camera.right = d;
+            dirLight.shadow.camera.top = d;
+            dirLight.shadow.camera.bottom = -d;
+            scene.add(dirLight);
+
+            // Groups
+            roadGroup = new THREE.Group();
+            sceneryGroup = new THREE.Group();
+            signGroup = new THREE.Group();
+            scene.add(roadGroup);
+            scene.add(sceneryGroup);
+            scene.add(signGroup);
+
+            // Build Procedural Assets
+            createRoad();
+            createTukTuk();
+            buildSceneryEnvironment();
+
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        function createTukTuk() {
+            tuktukGroup = new THREE.Group();
+
+            // Main Body Base
+            const bodyGeo = new THREE.BoxGeometry(1.6, 0.6, 2.2);
+            const bodyMat = new THREE.MeshStandardMaterial({ color: 0x0055ff, roughness: 0.3 }); // Thai Blue
+            const body = new THREE.Mesh(bodyGeo, bodyMat);
+            body.position.y = 0.6;
+            body.castShadow = true;
+            tuktukGroup.add(body);
+
+            // Front Cabin / Nose
+            const frontGeo = new THREE.BoxGeometry(1.3, 0.5, 0.8);
+            const frontMat = new THREE.MeshStandardMaterial({ color: 0xffd700, roughness: 0.2 }); // Gold Front
+            const front = new THREE.Mesh(frontGeo, frontMat);
+            front.position.set(0, 0.65, -1.2);
+            front.castShadow = true;
+            tuktukGroup.add(front);
+
+            // Roof Canvas (Curved Roof)
+            const roofGeo = new THREE.CylinderGeometry(1.0, 1.0, 2.2, 16, 1, false, 0, Math.PI);
+            const roofMat = new THREE.MeshStandardMaterial({ color: 0xee2222, side: THREE.DoubleSide }); // Red Canvas
+            const roof = new THREE.Mesh(roofGeo, roofMat);
+            roof.rotation.z = Math.PI / 2;
+            roof.rotation.y = Math.PI / 2;
+            roof.position.set(0, 1.8, -0.1);
+            roof.scale.set(0.88, 1, 0.85);
+            roof.castShadow = true;
+            tuktukGroup.add(roof);
+
+            // Roof Pillars
+            const pillarMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 0.8, roughness: 0.2 });
+            const pillarGeo = new THREE.CylinderGeometry(0.04, 0.04, 1.1);
+            const p1 = new THREE.Mesh(pillarGeo, pillarMat); p1.position.set(-0.75, 1.2, 0.9);
+            const p2 = new THREE.Mesh(pillarGeo, pillarMat); p2.position.set(0.75, 1.2, 0.9);
+            const p3 = new THREE.Mesh(pillarGeo, pillarMat); p3.position.set(-0.6, 1.2, -1.0);
+            const p4 = new THREE.Mesh(pillarGeo, pillarMat); p4.position.set(0.6, 1.2, -1.0);
+            tuktukGroup.add(p1, p2, p3, p4);
+
+            // Wheels (3 Wheels: 1 front, 2 rear)
+            const wheelGeo = new THREE.CylinderGeometry(0.35, 0.35, 0.25, 16);
+            const wheelMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.8 });
+            
+            const wRearLeft = new THREE.Mesh(wheelGeo, wheelMat);
+            wRearLeft.rotation.z = Math.PI / 2;
+            wRearLeft.position.set(-0.95, 0.35, 0.6);
+            
+            const wRearRight = new THREE.Mesh(wheelGeo, wheelMat);
+            wRearRight.rotation.z = Math.PI / 2;
+            wRearRight.position.set(0.95, 0.35, 0.6);
+
+            const wFront = new THREE.Mesh(wheelGeo, wheelMat);
+            wFront.rotation.z = Math.PI / 2;
+            wFront.position.set(0, 0.35, -1.3);
+
+            tuktukGroup.add(wRearLeft, wRearRight, wFront);
+
+            // Headlight
+            const lightGeo = new THREE.SphereGeometry(0.18, 12, 12);
+            const lightMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+            const headlight = new THREE.Mesh(lightGeo, lightMat);
+            headlight.position.set(0, 0.75, -1.62);
+            tuktukGroup.add(headlight);
+
+            // Seat Inside
+            const seatGeo = new THREE.BoxGeometry(1.4, 0.3, 0.6);
+            const seatMat = new THREE.MeshStandardMaterial({ color: 0x331100 });
+            const seat = new THREE.Mesh(seatGeo, seatMat);
+            seat.position.set(0, 0.7, 0.5);
+            tuktukGroup.add(seat);
+
+            tuktukGroup.position.set(0, 0, 3);
+            scene.add(tuktukGroup);
+        }
+
+        function createRoad() {
+            const roadWidth = 12;
+            const roadLength = 160;
+
+            for (let i = 0; i < 2; i++) {
+                const roadGeo = new THREE.PlaneGeometry(roadWidth, roadLength);
+                const roadMat = new THREE.MeshStandardMaterial({ color: 0x2c3e50, roughness: 0.9 });
+                const road = new THREE.Mesh(roadGeo, roadMat);
+                road.rotation.x = -Math.PI / 2;
+                road.position.z = -i * roadLength;
+                road.receiveShadow = true;
+                roadGroup.add(road);
+                roadPlanes.push(road);
+
+                // Lane Stripes (-1.6 and +1.6)
+                [-1.6, 1.6].forEach(x => {
+                    for (let z = -roadLength/2; z < roadLength/2; z += 6) {
+                        const stripeGeo = new THREE.PlaneGeometry(0.15, 3);
+                        const stripeMat = new THREE.MeshBasicMaterial({ color: 0xf1c40f });
+                        const stripe = new THREE.Mesh(stripeGeo, stripeMat);
+                        stripe.rotation.x = -Math.PI / 2;
+                        stripe.position.set(x, 0.02, road.position.z + z);
+                        roadGroup.add(stripe);
+                    }
+                });
+            }
+        }
+
+        function buildSceneryEnvironment() {
+            // Generate side objects along the road
+            for (let z = -140; z < 20; z += 12) {
+                spawnSideObject(-1, z);
+                spawnSideObject(1, z);
+            }
+        }
+
+        function spawnSideObject(side, z) {
+            const xPos = side * (7.5 + Math.random() * 2);
+            const objGroup = new THREE.Group();
+            const type = Math.floor(Math.random() * 5);
+
+            if (type === 0) {
+                // Pine / Evergreen Tree
+                const trunkGeo = new THREE.CylinderGeometry(0.2, 0.3, 1.2, 6);
+                const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5c4033 });
+                const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+                trunk.position.y = 0.6;
+
+                const leavesGeo = new THREE.ConeGeometry(1.2, 2.5, 6);
+                const leavesMat = new THREE.MeshStandardMaterial({ color: 0x2e8b57, flatShading: true });
+                const leaves = new THREE.Mesh(leavesGeo, leavesMat);
+                leaves.position.y = 2.2;
+
+                objGroup.add(trunk, leaves);
+            } else if (type === 1) {
+                // Palm / Coconut Tree
+                const trunkGeo = new THREE.CylinderGeometry(0.15, 0.25, 2.2, 6);
+                const trunkMat = new THREE.MeshStandardMaterial({ color: 0x8b5a2b });
+                const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+                trunk.position.y = 1.1;
+                trunk.rotation.z = side * -0.15;
+
+                const topGeo = new THREE.SphereGeometry(1.0, 6, 6);
+                const topMat = new THREE.MeshStandardMaterial({ color: 0x20bf6b, flatShading: true });
+                const top = new THREE.Mesh(topGeo, topMat);
+                top.position.set(side * -0.2, 2.3, 0);
+                top.scale.set(1.2, 0.4, 1.2);
+
+                objGroup.add(trunk, top);
+            } else if (type === 2) {
+                // Low Poly Thai Chedi / Temple Spire (Gold)
+                const baseGeo = new THREE.BoxGeometry(2, 0.8, 2);
+                const baseMat = new THREE.MeshStandardMaterial({ color: 0xeeeeee });
+                const base = new THREE.Mesh(baseGeo, baseMat);
+                base.position.y = 0.4;
+
+                const spireGeo = new THREE.ConeGeometry(0.8, 2.5, 8);
+                const spireMat = new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 0.5, roughness: 0.3 });
+                const spire = new THREE.Mesh(spireGeo, spireMat);
+                spire.position.y = 2.0;
+
+                objGroup.add(base, spire);
+            } else if (type === 3) {
+                // Thai Wooden House
+                const houseGeo = new THREE.BoxGeometry(2.2, 1.2, 2);
+                const houseMat = new THREE.MeshStandardMaterial({ color: 0x6f4e37 });
+                const house = new THREE.Mesh(houseGeo, houseMat);
+                house.position.y = 1.0;
+
+                const roofGeo = new THREE.ConeGeometry(1.8, 1.2, 4);
+                const roofMat = new THREE.MeshStandardMaterial({ color: 0xa52a2a, flatShading: true });
+                const roof = new THREE.Mesh(roofGeo, roofMat);
+                roof.rotation.y = Math.PI / 4;
+                roof.position.y = 2.2;
+
+                objGroup.add(house, roof);
+            } else {
+                // Low Poly Mountain / Hill
+                const mountGeo = new THREE.ConeGeometry(3 + Math.random() * 2, 4 + Math.random() * 2, 5);
+                const mountMat = new THREE.MeshStandardMaterial({ color: 0x3b7a57, flatShading: true });
+                const mount = new THREE.Mesh(mountGeo, mountMat);
+                mount.position.y = 1.8;
+
+                objGroup.add(mount);
+            }
+
+            objGroup.position.set(xPos, 0, z);
+            sceneryGroup.add(objGroup);
+            sceneryObjects.push(objGroup);
+        }
+
+        function createAnswerSigns(options) {
+            // Clear existing signs
+            while(signGroup.children.length > 0){
+                signGroup.remove(signGroup.children[0]);
+            }
+            gameState.signsInScene = [];
+
+            options.forEach((optText, index) => {
+                const laneX = LANE_X[index];
+                const signMeshGroup = new THREE.Group();
+
+                // Poles
+                const poleMat = new THREE.MeshStandardMaterial({ color: 0x444444, metalness: 0.5 });
+                const poleLeft = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 3.2), poleMat);
+                poleLeft.position.set(-1.2, 1.6, 0);
+                const poleRight = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 3.2), poleMat);
+                poleRight.position.set(1.2, 1.6, 0);
+
+                // Signboard Face (Canvas Texture for text - High Resolution 1024x512)
+                const canvas = document.createElement('canvas');
+                canvas.width = 1024;
+                canvas.height = 512;
+                const ctx = canvas.getContext('2d');
+
+                // Canvas Background & Border
+                const colors = ['#1e3799', '#b71540', '#079992']; // High-contrast distinct colors
+                ctx.fillStyle = colors[index % colors.length];
+                ctx.fillRect(0, 0, 1024, 512);
+
+                // Outer White Border
+                ctx.lineWidth = 28;
+                ctx.strokeStyle = '#ffffff';
+                ctx.strokeRect(14, 14, 996, 484);
+
+                // Inner Gold Frame
+                ctx.lineWidth = 12;
+                ctx.strokeStyle = '#f1c40f';
+                ctx.strokeRect(36, 36, 952, 440);
+
+                // Text Formatting & Styling
+                ctx.fillStyle = '#ffffff';
+                ctx.strokeStyle = '#000000'; // Dark outline for extra legibility
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+
+                const strLen = optText.length;
+                if (strLen > 14) {
+                    // Split long text into 2 lines
+                    const mid = Math.floor(strLen / 2);
+                    let splitIdx = optText.indexOf(' ', mid);
+                    if (splitIdx === -1) splitIdx = optText.indexOf(' ', 0);
+                    if (splitIdx === -1) splitIdx = mid;
+
+                    const line1 = optText.substring(0, splitIdx).trim();
+                    const line2 = optText.substring(splitIdx).trim();
+
+                    ctx.font = 'bold 72px Sarabun, Prompt, sans-serif';
+                    ctx.lineWidth = 14;
+                    
+                    ctx.strokeText(line1, 512, 180);
+                    ctx.fillText(line1, 512, 180);
+
+                    ctx.strokeText(line2, 512, 330);
+                    ctx.fillText(line2, 512, 330);
+                } else if (strLen > 8) {
+                    ctx.font = 'bold 80px Sarabun, Prompt, sans-serif';
+                    ctx.lineWidth = 16;
+                    ctx.strokeText(optText, 512, 256);
+                    ctx.fillText(optText, 512, 256);
+                } else {
+                    ctx.font = 'bold 96px Sarabun, Prompt, sans-serif';
+                    ctx.lineWidth = 20;
+                    ctx.strokeText(optText, 512, 256);
+                    ctx.fillText(optText, 512, 256);
+                }
+
+                const texture = new THREE.CanvasTexture(canvas);
+                const boardGeo = new THREE.BoxGeometry(3.0, 1.6, 0.15); // Larger board dimensions
+                const boardMat = new THREE.MeshStandardMaterial({ 
+                    map: texture, 
+                    roughness: 0.3,
+                    emissive: 0x000000 
+                });
+                const board = new THREE.Mesh(boardGeo, boardMat);
+                board.position.set(0, 2.3, 0);
+
+                // Flag accent
+                const flagGeo = new THREE.BoxGeometry(0.8, 0.35, 0.02);
+                const flagMat = new THREE.MeshBasicMaterial({ color: 0xef233c });
+                const flag = new THREE.Mesh(flagGeo, flagMat);
+                flag.position.set(0, 3.2, 0);
+
+                signMeshGroup.add(poleLeft, poleRight, board, flag);
+                signMeshGroup.position.set(laneX, 0, -60); // Spawn far down the road
+                
+                signMeshGroup.userData = {
+                    optionIndex: index,
+                    boardMat: boardMat,
+                    lane: index
+                };
+
+                signGroup.add(signMeshGroup);
+                gameState.signsInScene.push(signMeshGroup);
+            });
+
+            gameState.canCollision = true;
+        }
+
+        function setupInputs() {
+            // Keyboard
+            window.addEventListener('keydown', (e) => {
+                if (gameState.status !== "PLAYING") return;
+
+                if (e.key === "ArrowLeft" || e.key === "a" || e.key === "A") {
+                    moveLane(-1);
+                } else if (e.key === "ArrowRight" || e.key === "d" || e.key === "D") {
+                    moveLane(1);
+                }
+            });
+
+            // Touch Buttons
+            document.getElementById('btn-touch-left').addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                if (gameState.status === "PLAYING") moveLane(-1);
+            });
+            document.getElementById('btn-touch-right').addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                if (gameState.status === "PLAYING") moveLane(1);
+            });
+
+            // Touch Swipe Gesture
+            let touchStartX = 0;
+            window.addEventListener('touchstart', (e) => {
+                touchStartX = e.changedTouches[0].screenX;
+            }, { passive: true });
+
+            window.addEventListener('touchend', (e) => {
+                if (gameState.status !== "PLAYING") return;
+                const touchEndX = e.changedTouches[0].screenX;
+                const diff = touchEndX - touchStartX;
+                if (Math.abs(diff) > 30) {
+                    if (diff < 0) moveLane(1); // Swipe Left -> Move Right
+                    else moveLane(-1); // Swipe Right -> Move Left
+                }
+            }, { passive: true });
+        }
+
+        function moveLane(dir) {
+            const newLane = gameState.currentLane + dir;
+            if (newLane >= 0 && newLane <= 2) {
+                gameState.currentLane = newLane;
+                gameState.targetX = LANE_X[newLane];
+                audio.playMove();
+            }
+        }
+
+        function startGame() {
+            const nameInput = document.getElementById('input-player-name').value.trim();
+            gameState.playerName = nameInput || "นักเดินทางน้อย";
+
+            gameState.score = 0;
+            gameState.correctCount = 0;
+            gameState.wrongCount = 0;
+            gameState.currentQIndex = 0;
+            gameState.currentLane = 1;
+            gameState.targetX = LANE_X[1];
+            tuktukGroup.position.x = 0;
+
+            // Shuffle questions
+            gameState.questions = [...QUESTION_BANK].sort(() => Math.random() - 0.5);
+
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('gameover-screen').classList.add('hidden');
+            document.getElementById('game-hud').classList.remove('hidden');
+            document.getElementById('touch-controls').classList.remove('hidden');
+
+            document.getElementById('hud-player-name').textContent = gameState.playerName;
+            document.getElementById('hud-total-q').textContent = gameState.questions.length;
+
+            gameState.status = "PLAYING";
+            audio.init();
+
+            loadQuestion(0);
+        }
+
+        function loadQuestion(index) {
+            if (index >= gameState.questions.length) {
+                endGame();
+                return;
+            }
+
+            gameState.currentQIndex = index;
+            const qData = gameState.questions[index];
+
+            // Shuffle answer options so correct answers aren't stuck in one lane
+            const originalCorrectText = qData.options[qData.answer];
+            const shuffledOptions = [...qData.options];
+            for (let i = shuffledOptions.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffledOptions[i], shuffledOptions[j]] = [shuffledOptions[j], shuffledOptions[i]];
+            }
+
+            gameState.currentCorrectIndex = shuffledOptions.indexOf(originalCorrectText);
+            gameState.currentShuffledOptions = shuffledOptions;
+
+            document.getElementById('hud-current-q').textContent = index + 1;
+            document.getElementById('hud-score').textContent = gameState.score;
+            document.getElementById('question-box').textContent = qData.q;
+            document.getElementById('hud-theme-title').textContent = qData.theme || "ภูมิภาคประเทศไทย";
+
+            // Update Progress Bar
+            const progressPct = ((index) / gameState.questions.length) * 100;
+            document.getElementById('progress-bar-fill').style.width = `${progressPct}%`;
+
+            // Change Environment Sky Color based on theme
+            updateEnvironmentTheme(qData.theme);
+
+            createAnswerSigns(shuffledOptions);
+        }
+
+        function updateEnvironmentTheme(theme) {
+            let skyColor = 0x87ceeb; // Default Sky
+            if (theme && theme.includes("ทะเล")) skyColor = 0x38ada9;
+            else if (theme && theme.includes("ภูเขา")) skyColor = 0x60a3bc;
+            else if (theme && theme.includes("อีสาน")) skyColor = 0xf6b93b;
+            else if (theme && theme.includes("วัด")) skyColor = 0xfa983a;
+
+            scene.background.setHex(skyColor);
+            scene.fog.color.setHex(skyColor);
+        }
+
+        function checkAnswer(chosenIndex) {
+            if (!gameState.canCollision) return;
+            gameState.canCollision = false;
+
+            const isCorrect = (chosenIndex === gameState.currentCorrectIndex);
+
+            // Highlight Sign
+            gameState.signsInScene.forEach((sign) => {
+                if (sign.userData.optionIndex === chosenIndex) {
+                    if (isCorrect) {
+                        sign.userData.boardMat.emissive.setHex(0x00ff00);
+                    } else {
+                        sign.userData.boardMat.emissive.setHex(0xff0000);
+                    }
+                }
+            });
+
+            if (isCorrect) {
+                gameState.score += 1;
+                gameState.correctCount += 1;
+                audio.playCorrect();
+                showToast("ถูกต้อง เดินทางต่อได้!", true);
+            } else {
+                gameState.score = Math.max(0, gameState.score - 1);
+                gameState.wrongCount += 1;
+                audio.playWrong();
+                showToast("ยังไม่ถูก ลองเรียนรู้เส้นทางใหม่", false);
+            }
+
+            document.getElementById('hud-score').textContent = gameState.score;
+
+            // Wait 1 second then load next question
+            setTimeout(() => {
+                loadQuestion(gameState.currentQIndex + 1);
+            }, 1100);
+        }
+
+        function showToast(msg, isSuccess) {
+            const toast = document.getElementById('feedback-toast');
+            const card = document.getElementById('feedback-card');
+            const icon = document.getElementById('feedback-icon');
+            const msgEl = document.getElementById('feedback-msg');
+
+            msgEl.textContent = msg;
+
+            if (isSuccess) {
+                card.className = "px-8 py-4 rounded-3xl text-center shadow-2xl border-4 border-emerald-300 bg-emerald-600/90 text-white font-extrabold text-xl sm:text-2xl flex items-center gap-3 backdrop-blur";
+                icon.className = "fa-solid fa-circle-check text-3xl";
+            } else {
+                card.className = "px-8 py-4 rounded-3xl text-center shadow-2xl border-4 border-rose-300 bg-rose-600/90 text-white font-extrabold text-xl sm:text-2xl flex items-center gap-3 backdrop-blur";
+                icon.className = "fa-solid fa-circle-xmark text-3xl";
+            }
+
+            toast.classList.remove('opacity-0', 'scale-90');
+            toast.classList.add('opacity-100', 'scale-100');
+
+            setTimeout(() => {
+                toast.classList.remove('opacity-100', 'scale-100');
+                toast.classList.add('opacity-0', 'scale-90');
+            }, 900);
+        }
+
+        function endGame() {
+            gameState.status = "GAMEOVER";
+
+            document.getElementById('game-hud').classList.add('hidden');
+            document.getElementById('touch-controls').classList.add('hidden');
+
+            // Calculate Rank
+            const total = gameState.questions.length;
+            const score = gameState.score;
+            let rankTitle = "";
+
+            if (score >= 17) rankTitle = "🏆 นักเที่ยวไทยตัวจริง";
+            else if (score >= 13) rankTitle = "🧭 นักสำรวจภูมิภาค";
+            else if (score >= 9) rankTitle = "🎒 นักเดินทางฝึกหัด";
+            else rankTitle = "🗺️ เตรียมแผนที่แล้วลองใหม่";
+
+            document.getElementById('go-rank-title').textContent = rankTitle;
+            document.getElementById('go-player-name').textContent = `ผู้เล่น: ${gameState.playerName}`;
+            document.getElementById('go-score').textContent = score;
+            document.getElementById('go-correct').textContent = gameState.correctCount;
+            document.getElementById('go-wrong').textContent = gameState.wrongCount;
+
+            saveLeaderboard({
+                name: gameState.playerName,
+                score: score,
+                correct: gameState.correctCount,
+                wrong: gameState.wrongCount,
+                date: new Date().toLocaleDateString('th-TH')
+            });
+
+            document.getElementById('gameover-screen').classList.remove('hidden');
+        }
+
+        function saveLeaderboard(entry) {
+            let list = [];
+            try {
+                list = JSON.parse(localStorage.getItem(LEADERBOARD_KEY)) || [];
+            } catch (e) {
+                list = [];
+            }
+
+            list.push(entry);
+            list.sort((a, b) => b.score - a.score || b.correct - a.correct);
+            list = list.slice(0, 10); // Keep Top 10
+
+            try {
+                localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(list));
+            } catch (e) {}
+
+            renderStartLeaderboard(list);
+        }
+
+        function renderStartLeaderboard(list) {
+            if (!list) {
+                try {
+                    list = JSON.parse(localStorage.getItem(LEADERBOARD_KEY)) || [];
+                } catch (e) { list = []; }
+            }
+
+            const container = document.getElementById('start-leaderboard-list');
+            if (list.length === 0) {
+                container.innerHTML = `<div class="text-slate-500 text-center py-3">ยังไม่มีข้อมูลการเล่น เป็นคนแรกเลย!</div>`;
+                return;
+            }
+
+            container.innerHTML = list.map((item, idx) => `
+                <div class="flex justify-between items-center bg-slate-900/80 px-3 py-1.5 rounded-lg border border-slate-800">
+                    <div class="flex items-center gap-2">
+                        <span class="font-bold ${idx === 0 ? 'text-yellow-400' : idx === 1 ? 'text-slate-300' : idx === 2 ? 'text-amber-600' : 'text-slate-500'}">
+                            #${idx + 1}
+                        </span>
+                        <span class="font-semibold text-slate-200">${escapeHtml(item.name)}</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="text-xs text-emerald-400">ถูก ${item.correct}</span>
+                        <span class="font-extrabold text-amber-300">${item.score} คะแนน</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function escapeHtml(str) {
+            return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            if (gameState.status === "PLAYING") {
+                // Smooth TukTuk Steering Lerp
+                tuktukGroup.position.x += (gameState.targetX - tuktukGroup.position.x) * 0.15;
+                tuktukGroup.rotation.z = -(gameState.targetX - tuktukGroup.position.x) * 0.08;
+
+                // Move Road Planes (Looping)
+                roadPlanes.forEach(road => {
+                    road.position.z += 0.35;
+                    if (road.position.z >= 80) {
+                        road.position.z -= 320;
+                    }
+                });
+
+                // Move Scenery
+                sceneryObjects.forEach(obj => {
+                    obj.position.z += 0.35;
+                    if (obj.position.z >= 20) {
+                        obj.position.z -= 160;
+                    }
+                });
+
+                // Move Answer Signs & Check Collision
+                signGroup.children.forEach(sign => {
+                    sign.position.z += gameState.signSpeed;
+
+                    // Collision Detection with TukTuk
+                    if (gameState.canCollision && sign.position.z >= 1.5 && sign.position.z <= 3.5) {
+                        if (gameState.currentLane === sign.userData.lane) {
+                            checkAnswer(sign.userData.optionIndex);
+                        }
+                    }
+                });
+
+            } else if (gameState.status === "START") {
+                // Idle TukTuk animation on Start Screen
+                if (tuktukGroup) {
+                    tuktukGroup.position.x = Math.sin(Date.now() * 0.002) * 2;
+                    tuktukGroup.rotation.z = Math.sin(Date.now() * 0.002) * 0.05;
+                }
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        window.onload = function () {
+            initThree();
+            setupInputs();
+
+            // Render existing Leaderboard
+            renderStartLeaderboard();
+
+            // Button Bindings
+            document.getElementById('btn-start-game').addEventListener('click', startGame);
+            document.getElementById('btn-restart').addEventListener('click', startGame);
+            document.getElementById('btn-home').addEventListener('click', () => {
+                document.getElementById('gameover-screen').classList.add('hidden');
+                document.getElementById('start-screen').classList.remove('hidden');
+                gameState.status = "START";
+            });
+
+            // Sound Toggle Button
+            document.getElementById('btn-sound-toggle').addEventListener('click', () => {
+                audio.muted = !audio.muted;
+                const icon = document.getElementById('sound-icon');
+                if (audio.muted) {
+                    icon.className = "fa-solid fa-volume-xmark text-xl text-rose-400";
+                } else {
+                    icon.className = "fa-solid fa-volume-high text-xl text-amber-300";
+                }
+            });
+
+            // Start Main Animation Loop
+            animate();
+        };
+    </script>
+</body>
+</html>
